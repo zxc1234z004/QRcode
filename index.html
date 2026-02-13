@@ -3,12 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>極簡 QR Code 掃描器</title>
+    <title>QR Code 簽到管理系統</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- 引入 QR Code 掃描核心函式庫 -->
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
-        /* 自定義掃描區域的樣式，覆蓋函式庫預設外觀 */
         #reader {
             border: none !important;
             border-radius: 1rem;
@@ -30,130 +28,212 @@
             border: 1px solid #ddd !important;
             margin: 10px 0 !important;
         }
+        .check-in-item {
+            animation: slideIn 0.3s ease-out forwards;
+        }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
     </style>
 </head>
-<body class="bg-slate-50 min-h-screen font-sans">
+<body class="bg-slate-100 min-h-screen font-sans pb-10">
 
     <div class="max-w-md mx-auto px-4 py-8">
-        <!-- 標題區 -->
-        <div class="text-center mb-8">
-            <h1 class="text-3xl font-bold text-slate-800 mb-2">QR 掃描器</h1>
-            <p class="text-slate-500">對準 QR Code 即可自動辨識</p>
+        <!-- 標題 -->
+        <div class="text-center mb-6">
+            <h1 class="text-2xl font-bold text-slate-800 tracking-tight">成員簽到系統</h1>
+            <p class="text-slate-500 text-sm mt-1">請掃描成員 QR Code 進行簽到</p>
         </div>
 
-        <!-- 掃描容器 -->
-        <div class="bg-white rounded-2xl shadow-xl p-4 mb-6">
+        <!-- 掃描區域 -->
+        <div class="bg-white rounded-3xl shadow-xl p-4 mb-6 ring-1 ring-slate-200">
             <div id="reader" class="w-full"></div>
         </div>
 
-        <!-- 結果顯示區 -->
-        <div id="result-container" class="hidden animate-in fade-in slide-in-from-bottom-4 duration-300">
-            <div class="bg-white rounded-2xl shadow-lg p-6 border-l-4 border-blue-500">
-                <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-2">掃描結果</h2>
-                <div id="result-text" class="text-lg font-medium text-slate-800 break-all mb-4">
-                    <!-- 這裡會顯示掃描到的內容 -->
+        <!-- 成員資訊確認 (掃描後顯示) -->
+        <div id="member-card" class="hidden animate-in fade-in slide-in-from-bottom-4 duration-300 mb-6">
+            <div class="bg-white rounded-3xl shadow-lg border-2 border-blue-500 p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <span class="bg-blue-100 text-blue-600 text-xs font-bold px-3 py-1 rounded-full">待簽到成員</span>
+                    <span id="member-id-badge" class="text-slate-400 text-xs font-mono">ID: --</span>
                 </div>
                 
-                <div class="flex gap-3">
-                    <button onclick="copyToClipboard()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-3 px-4 rounded-xl transition-colors duration-200 flex items-center justify-center gap-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
-                        複製內容
-                    </button>
-                    <button id="open-link-btn" class="hidden flex-1 bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 px-4 rounded-xl shadow-md shadow-blue-200 transition-all duration-200 flex items-center justify-center gap-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-                        前往連結
-                    </button>
+                <div class="space-y-4 mb-6">
+                    <div>
+                        <p class="text-slate-400 text-xs uppercase font-semibold">姓名</p>
+                        <p id="info-name" class="text-2xl font-bold text-slate-800">--</p>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <p class="text-slate-400 text-xs uppercase font-semibold">隸屬單位/寺廟</p>
+                            <p id="info-temple" class="text-slate-700">--</p>
+                        </div>
+                        <div>
+                            <p class="text-slate-400 text-xs uppercase font-semibold">類型</p>
+                            <p id="info-scn" class="text-slate-700">--</p>
+                        </div>
+                    </div>
                 </div>
+
+                <button id="confirm-checkin-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-2xl shadow-lg shadow-blue-200 transition-all active:scale-95 flex items-center justify-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    確認簽到並存檔
+                </button>
             </div>
         </div>
 
-        <!-- 提示區 -->
-        <div class="mt-8 text-center text-slate-400 text-sm">
-            提示：請確保環境光線充足，並授權相機權限。
+        <!-- 最近簽到紀錄 -->
+        <div class="mt-8">
+            <h3 class="text-slate-500 font-bold text-sm mb-4 px-2 flex justify-between items-center">
+                <span>最近簽到紀錄</span>
+                <span id="record-count" class="bg-slate-200 text-slate-600 text-[10px] px-2 py-0.5 rounded-full">0</span>
+            </h3>
+            <div id="history-list" class="space-y-3">
+                <!-- 紀錄會顯示在這裡 -->
+                <p id="no-record" class="text-center py-10 text-slate-300 text-sm border-2 border-dashed border-slate-200 rounded-2xl">尚無簽到紀錄</p>
+            </div>
         </div>
     </div>
 
-    <!-- 提示框 (Toast) -->
-    <div id="toast" class="fixed bottom-8 left-1/2 transform -translate-x-1/2 bg-slate-800 text-white px-6 py-3 rounded-full shadow-2xl opacity-0 transition-opacity duration-300 pointer-events-none text-sm font-medium">
-        已複製到剪貼簿
+    <!-- 狀態提示 -->
+    <div id="toast" class="fixed bottom-8 left-1/2 transform -translate-x-1/2 bg-slate-800 text-white px-6 py-3 rounded-full shadow-2xl opacity-0 transition-opacity duration-300 pointer-events-none text-sm font-medium z-50">
+        簽到成功！已同步至雲端
     </div>
 
     <script>
-        const resultContainer = document.getElementById('result-container');
-        const resultText = document.getElementById('result-text');
-        const openLinkBtn = document.getElementById('open-link-btn');
+        // --- 設定區：請將你的 Google Apps Script Web App URL 貼在下方 ---
+        const SPREADSHEET_URL = "https://script.google.com/macros/s/AKfycbw83Q0_vmrLbgYKjwXVcdZ54nA_PNKPKKdPxSztIZuP1oIHzFPHH7H5tLQ10KKqa96E/exec";
+        
+        const memberCard = document.getElementById('member-card');
+        const historyList = document.getElementById('history-list');
+        const recordCount = document.getElementById('record-count');
+        const noRecord = document.getElementById('no-record');
         const toast = document.getElementById('toast');
+        const confirmBtn = document.getElementById('confirm-checkin-btn');
 
-        let lastResult = "";
+        let currentMember = null;
+        let scanHistory = [];
 
-        // 檢查是否為網址
-        function isURL(string) {
+        // 成功掃描
+        function onScanSuccess(decodedText) {
             try {
-                new URL(string);
-                return true;
-            } catch (_) {
-                return false;
+                // 假設 QR Code 內容是 JSON 格式: {"memberid":"001","name":"王小明","temple":"慈雲寺","scnMember":"一般成員"}
+                const data = JSON.parse(decodedText);
+                
+                // 如果已經掃過且正在顯示中，則不重複動作
+                if (currentMember && currentMember.memberid === data.memberid) return;
+
+                currentMember = data;
+                showMemberInfo(data);
+                
+                if (navigator.vibrate) navigator.vibrate(100);
+            } catch (e) {
+                console.error("解析失敗，可能不是正確的 JSON 格式", decodedText);
+                // 如果不是 JSON，嘗試用逗號分隔解析
+                const parts = decodedText.split(',');
+                if (parts.length >= 4) {
+                    currentMember = {
+                        memberid: parts[0],
+                        name: parts[1],
+                        temple: parts[2],
+                        scnMember: parts[3]
+                    };
+                    showMemberInfo(currentMember);
+                }
             }
         }
 
-        // 成功掃描的回呼函式
-        function onScanSuccess(decodedText, decodedResult) {
-            // 避免重複處理相同的掃描結果
-            if (decodedText === lastResult) return;
-            lastResult = decodedText;
-
-            // 震動回饋 (如果手機支援)
-            if (navigator.vibrate) navigator.vibrate(100);
-
-            // 顯示結果
-            resultContainer.classList.remove('hidden');
-            resultText.innerText = decodedText;
-
-            // 判斷是否為連結，若是則顯示按鈕
-            if (isURL(decodedText)) {
-                openLinkBtn.classList.remove('hidden');
-                openLinkBtn.onclick = () => window.open(decodedText, '_blank');
-            } else {
-                openLinkBtn.classList.add('hidden');
-            }
+        function showMemberInfo(data) {
+            document.getElementById('member-id-badge').innerText = `ID: ${data.memberid || '未知'}`;
+            document.getElementById('info-name').innerText = data.name || '未知';
+            document.getElementById('info-temple').innerText = data.temple || '無';
+            document.getElementById('info-scn').innerText = data.scnMember || '無';
             
-            // 滾動到結果區
-            resultContainer.scrollIntoView({ behavior: 'smooth', block: 'end' });
+            memberCard.classList.remove('hidden');
+            memberCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
 
-        function onScanFailure(error) {
-            // 通常不需要處理掃描失敗，因為每秒都在嘗試辨識
+        // 確認簽到按鈕點擊
+        confirmBtn.onclick = async () => {
+            if (!currentMember) return;
+
+            const originalBtnText = confirmBtn.innerHTML;
+            confirmBtn.disabled = true;
+            confirmBtn.innerHTML = "傳送中...";
+
+            // 準備簽到資料
+            const signData = {
+                ...currentMember,
+                timestamp: new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' })
+            };
+
+            try {
+                // 1. 同步到試算表 (這部分會因為 URL 為空而失敗，我們用 try-catch 包起來)
+                if (SPREADSHEET_URL.includes("你的網址")) {
+                    console.log("尚未設定試算表 URL，僅進行本地紀錄");
+                } else {
+                    await fetch(SPREADSHEET_URL, {
+                        method: 'POST',
+                        mode: 'no-cors', // 處理跨網域問題
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(signData)
+                    });
+                }
+
+                // 2. 更新本地 UI
+                addRecordToHistory(signData);
+                showToast("簽到成功！" + (SPREADSHEET_URL.includes("你的網址") ? "(本地)" : ""));
+                
+                // 3. 重設狀態
+                memberCard.classList.add('hidden');
+                currentMember = null;
+            } catch (err) {
+                showToast("同步失敗，但已記錄於本地");
+                addRecordToHistory(signData);
+            } finally {
+                confirmBtn.disabled = false;
+                confirmBtn.innerHTML = originalBtnText;
+            }
+        };
+
+        function addRecordToHistory(data) {
+            noRecord.classList.add('hidden');
+            
+            const div = document.createElement('div');
+            div.className = "check-in-item bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between";
+            div.innerHTML = `
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-green-100 text-green-600 rounded-full flex items-center justify-center font-bold">
+                        ${data.name[0]}
+                    </div>
+                    <div>
+                        <p class="font-bold text-slate-800">${data.name}</p>
+                        <p class="text-[10px] text-slate-400">${data.timestamp}</p>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <p class="text-xs text-slate-500 font-medium">${data.temple}</p>
+                    <span class="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-md mt-1 inline-block">${data.scnMember}</span>
+                </div>
+            `;
+            historyList.prepend(div);
+            
+            scanHistory.push(data);
+            recordCount.innerText = scanHistory.length;
+        }
+
+        function showToast(msg) {
+            toast.innerText = msg;
+            toast.style.opacity = "1";
+            setTimeout(() => toast.style.opacity = "0", 3000);
         }
 
         // 初始化掃描器
         let html5QrcodeScanner = new Html5QrcodeScanner(
-            "reader", 
-            { 
-                fps: 15, 
-                qrbox: { width: 250, height: 250 },
-                aspectRatio: 1.0 
-            },
-            /* verbose= */ false
+            "reader", { fps: 15, qrbox: { width: 220, height: 220 }, aspectRatio: 1.0 }, false
         );
-        
-        html5QrcodeScanner.render(onScanSuccess, onScanFailure);
-
-        // 複製功能
-        function copyToClipboard() {
-            const text = resultText.innerText;
-            const tempInput = document.createElement("input");
-            tempInput.value = text;
-            document.body.appendChild(tempInput);
-            tempInput.select();
-            document.execCommand("copy");
-            document.body.removeChild(tempInput);
-
-            // 顯示提示
-            toast.style.opacity = "1";
-            setTimeout(() => {
-                toast.style.opacity = "0";
-            }, 2000);
-        }
+        html5QrcodeScanner.render(onScanSuccess, () => {});
     </script>
 </body>
 </html>
