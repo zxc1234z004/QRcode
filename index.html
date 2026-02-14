@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>祈福者多場地簽到系統</title>
+    <title>寶光崇正班期簽到系統</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
@@ -67,7 +67,6 @@
     </div>
 
     <script>
-        // 修正了下方網址遺漏的引號
         const SPREADSHEET_URL = "https://script.google.com/macros/s/AKfycbxMS3vOqZEVZ2sAFL7H5M3U0bZcyeR8En2T_5_0Mo5YWXHnG7O8_HgJcPruqYr2PV0o/exec";
         
         let allLocations = [];
@@ -92,7 +91,6 @@
 
         function clearLog() { debugLog.innerHTML = ""; }
 
-        // 1. 載入所有地點
         async function loadLocations() {
             log("☁️ 正在同步多場地設定...");
             try {
@@ -104,17 +102,15 @@
                         `<option value="${idx}">${loc.locationName}</option>`
                     ).join('');
                     
-                    // 預設選擇第一個
                     changeLocation();
                     log(`✅ 已載入 ${allLocations.length} 個地點`, "text-green-400 font-bold");
                 }
             } catch (e) { log("❌ 地點載入失敗，請檢查網路", "text-red-400"); }
         }
 
-        // 2. 切換地點時重置定位
         function changeLocation() {
             currentLocation = allLocations[selector.value];
-            verifiedCoords = null; // 切換場地必須重新定位一次
+            verifiedCoords = null;
             log(`📍 切換至：${currentLocation.locationName}`, "text-blue-400 font-bold");
         }
 
@@ -145,7 +141,21 @@
 
         async function onScanSuccess(decodedText) {
             if (isProcessing || !currentLocation) return;
-            const memberid = decodedText.trim();
+            
+            // 解析邏輯：優先從 JSON 格式讀取 MemberID 欄位
+            let memberid = "";
+            try {
+                const qrData = JSON.parse(decodedText);
+                memberid = (qrData.MemberID || qrData.memberid || qrData.id || "").toString().trim();
+            } catch (e) {
+                memberid = decodedText.trim();
+            }
+
+            if (!memberid) {
+                log("❗ 掃描內容無效，無法識別 ID", "text-yellow-500");
+                return;
+            }
+
             const now = Date.now();
             if (memberid === lastId && (now - lastTime < 5000)) return;
 
@@ -166,6 +176,7 @@
                     verifiedCoords = pos;
                 }
 
+                log(`🚀 正在驗證 ID: ${memberid}...`);
                 const response = await fetch(SPREADSHEET_URL, {
                     method: 'POST',
                     body: JSON.stringify({ 
