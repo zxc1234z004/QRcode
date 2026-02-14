@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QR Code 自動簽到系統 (祈福者版)</title>
+    <title>祈福者簽到驗證系統</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
@@ -15,20 +15,21 @@
         #reader__dashboard_section_csr button {
             background-color: #3b82f6 !important;
             color: white !important;
-            padding: 0.8rem 1.5rem !important;
-            border-radius: 1rem !important;
+            padding: 0.6rem 1.2rem !important;
+            border-radius: 0.75rem !important;
             border: none !important;
             cursor: pointer !important;
             margin: 5px !important;
-            font-size: 16px !important;
+            font-size: 14px !important;
             font-weight: 700;
         }
-        .check-in-item {
-            animation: slideIn 0.3s ease-out forwards;
-        }
-        @keyframes slideIn {
-            from { opacity: 0; transform: translateY(-10px); }
-            to { opacity: 1; transform: translateY(0); }
+        #debug-log {
+            font-family: monospace;
+            font-size: 11px;
+            max-height: 150px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column-reverse;
         }
     </style>
 </head>
@@ -36,221 +37,315 @@
 
     <div class="max-w-md mx-auto px-4 py-8">
         <!-- 標題 -->
-        <div class="text-center mb-8">
-            <h1 class="text-4xl font-black text-slate-800 tracking-tighter">自動簽到系統</h1>
-            <p class="text-blue-600 font-bold text-lg mt-2 flex items-center justify-center gap-2">
-                <span class="relative flex h-3 w-3">
+        <div class="text-center mb-6">
+            <h1 class="text-3xl font-black text-slate-800 tracking-tighter">祈福者簽到驗證</h1>
+            <p id="system-status" class="text-blue-600 font-bold text-sm mt-1 flex items-center justify-center gap-2">
+                <span class="relative flex h-2 w-2">
                     <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                    <span class="relative inline-flex rounded-full h-3 w-3 bg-blue-600"></span>
+                    <span class="relative inline-flex rounded-full h-2 w-2 bg-blue-600"></span>
                 </span>
-                系統正在掃描中...
+                定位驗證已啟動
             </p>
         </div>
 
         <!-- 掃描區域 -->
-        <div class="relative bg-white rounded-[2.5rem] shadow-2xl p-3 mb-10 ring-8 ring-white/50">
+        <div class="relative bg-white rounded-[2rem] shadow-2xl p-2 mb-6 ring-4 ring-white">
             <div id="reader" class="w-full"></div>
         </div>
 
-        <!-- 當前簽到成功顯示 (加大字體) -->
-        <div id="success-status" class="hidden animate-in zoom-in duration-300 mb-10">
-            <div class="bg-green-500 text-white rounded-[2rem] shadow-2xl p-8 flex flex-col items-center text-center gap-4">
-                <div class="bg-white/30 p-4 rounded-full mb-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                </div>
+        <!-- 狀態顯示區域 -->
+        <div id="status-card" class="hidden animate-in zoom-in duration-200 mb-6 border-b-8 rounded-[2rem] overflow-hidden transition-all">
+            <!-- 1. 驗證中 -->
+            <div id="card-loading" class="hidden bg-blue-600 text-white p-8 flex flex-col items-center gap-3">
+                <div class="animate-spin h-10 w-10 border-4 border-white/30 border-t-white rounded-full"></div>
+                <p id="loading-text" class="text-xl font-black tracking-widest uppercase text-white">正在驗證定位...</p>
+            </div>
+
+            <!-- 2. 成功 -->
+            <div id="card-success" class="hidden bg-green-600 text-white p-8 flex flex-col items-center gap-4 text-center">
+                <span id="display-seat" class="bg-white text-green-600 font-black text-xl px-4 py-1 rounded-xl shadow-lg">座號 --</span>
                 <div>
-                    <p class="text-lg opacity-90 font-black uppercase tracking-[0.2em] mb-1">簽到成功 SUCCESS</p>
-                    <p id="last-scanned-prayer" class="text-5xl font-black">祈福者姓名</p>
+                    <p id="display-prayer" class="text-5xl font-black mb-1 leading-none text-white">祈福者</p>
+                    <p id="display-temple" class="text-lg opacity-90 font-bold text-white">隸屬單位</p>
                 </div>
-                <div id="last-scanned-details" class="text-xl font-medium opacity-90 mt-2">
-                    <!-- 顯示單位 -->
+            </div>
+
+            <!-- 3. 失敗 -->
+            <div id="card-error" class="hidden bg-red-600 text-white p-8 flex flex-col items-center gap-3 text-center">
+                <div class="bg-white/20 p-2 rounded-full">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </div>
+                <p id="error-message" class="text-2xl font-black text-white">簽到失敗</p>
+                <div class="bg-black/20 px-3 py-1 rounded text-[10px] font-mono opacity-80 break-all w-full text-left text-white">
+                    內容/原因: <span id="scanned-id-hint" class="text-yellow-300 font-bold">--</span>
                 </div>
             </div>
         </div>
 
-        <!-- 最近簽到紀錄 -->
-        <div class="mt-12">
-            <div class="flex justify-between items-end mb-6 px-2">
-                <h3 class="text-slate-700 font-black text-2xl">今日簽到紀錄</h3>
-                <span id="record-count" class="bg-blue-600 text-white text-sm font-black px-4 py-1 rounded-full shadow-lg">0 人</span>
+        <!-- 即時日誌 -->
+        <div class="bg-slate-800 rounded-2xl p-4 shadow-inner mb-6">
+            <div class="flex justify-between items-center mb-2 border-b border-slate-700 pb-2">
+                <span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">系統定位偵錯日誌</span>
+                <div class="flex gap-2">
+                    <button onclick="testConnection()" class="text-[10px] bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded border border-blue-500/30 font-bold hover:bg-blue-500 hover:text-white">測試連線</button>
+                    <button onclick="clearLog()" class="text-[10px] text-slate-500 hover:text-white font-bold underline">清除</button>
+                </div>
             </div>
-            <div id="history-list" class="space-y-4">
-                <p id="no-record" class="text-center py-16 text-slate-300 text-lg border-4 border-dashed border-slate-200 rounded-[2rem] font-bold">目前尚無紀錄</p>
+            <div id="debug-log" class="text-blue-200">
+                <div class="opacity-50 text-white">等待掃描中...</div>
             </div>
         </div>
-    </div>
 
-    <!-- 浮動提示框 -->
-    <div id="toast" class="fixed top-12 left-1/2 transform -translate-x-1/2 bg-slate-900 text-white px-10 py-4 rounded-full shadow-2xl opacity-0 transition-all duration-300 pointer-events-none text-xl font-black z-50">
-        讀取中...
+        <!-- 簽到清單 -->
+        <div class="bg-white rounded-3xl shadow-sm border border-slate-200 p-4">
+            <div class="flex justify-between items-center mb-3">
+                <h3 class="font-bold text-slate-500 text-xs uppercase tracking-wider">今日簽到紀錄 ( <span id="record-count">0</span> 人 )</h3>
+            </div>
+            <div id="history-list" class="space-y-2 max-h-40 overflow-y-auto pr-1">
+                <p id="no-record" class="text-center py-4 text-slate-300 text-xs italic font-medium">尚未有成功紀錄</p>
+            </div>
+        </div>
     </div>
 
     <script>
-        // 設定區
-        const SPREADSHEET_URL = "https://script.google.com/macros/s/AKfycbzHQQt2IfFwnSh711kgi1smbEALFVf9z1D_YT9RUzMZDuJnucloVd4XKWgNIHpnviSx/exec";
+        // --- 設定區 ---
+        const SPREADSHEET_URL = "https://script.google.com/macros/s/AKfycbxhunuqELfhyb1DUJQluATiNMsz8ZtnesUicfyeedyYeJ9U8hHRjdOJod3kRl1JtRnT/exec";
         
-        const historyList = document.getElementById('history-list');
-        const recordCount = document.getElementById('record-count');
-        const noRecord = document.getElementById('no-record');
-        const toast = document.getElementById('toast');
-        const successStatus = document.getElementById('success-status');
-        const lastScannedPrayer = document.getElementById('last-scanned-prayer');
-        const lastScannedDetails = document.getElementById('last-scanned-details');
-
-        let scanHistory = [];
+        // 定位簽到設定 (以台北 101 為例，請修改為現場座標)
+        const TARGET_LOCATION = {
+            lat: 24.133658, // 目標緯度
+            lng: 120.717338 // 目標經度
+        };
+        const DISTANCE_LIMIT = 500; // 距離限制 (公尺)，建議設定 300~500 較穩定
+        
+        const statusCard = document.getElementById('status-card');
+        const cardLoading = document.getElementById('card-loading');
+        const cardSuccess = document.getElementById('card-success');
+        const cardError = document.getElementById('card-error');
+        const debugLog = document.getElementById('debug-log');
+        const loadingText = document.getElementById('loading-text');
+        
         let isProcessing = false;
-        let lastScannedId = "";
-        let lastScannedTime = 0;
+        let lastId = "";
+        let lastTime = 0;
 
-        // 生成簽到成功音效
-        function playSuccessSound() {
+        function log(msg, color = "text-blue-200") {
+            const time = new Date().toLocaleTimeString('zh-TW', {hour12: false});
+            const div = document.createElement('div');
+            div.className = `mb-1 ${color}`;
+            div.innerHTML = `<span class="opacity-40 text-white">[${time}]</span> ${msg}`;
+            debugLog.appendChild(div);
+            debugLog.scrollTop = debugLog.scrollHeight;
+        }
+
+        function clearLog() { debugLog.innerHTML = ""; log("日誌已清除..."); }
+
+        // 計算兩點之間的距離 (Haversine 公式)
+        function getDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371e3; // 地球半徑 (公尺)
+            const φ1 = lat1 * Math.PI / 180;
+            const φ2 = lat2 * Math.PI / 180;
+            const Δφ = (lat2 - lat1) * Math.PI / 180;
+            const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+            const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+                      Math.cos(φ1) * Math.cos(φ2) *
+                      Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+            return R * c; // 回傳公尺
+        }
+
+        // 取得目前定位
+        function getCurrentLocation() {
+            return new Promise((resolve, reject) => {
+                if (!navigator.geolocation) {
+                    reject(new Error("您的瀏覽器不支援地理定位"));
+                    return;
+                }
+                navigator.geolocation.getCurrentPosition(
+                    (position) => resolve(position.coords),
+                    (error) => {
+                        let msg = "定位失敗";
+                        if (error.code === 1) msg = "請允許相機與定位權限";
+                        else if (error.code === 2) msg = "無法取得定位訊號";
+                        else if (error.code === 3) msg = "定位逾時";
+                        reject(new Error(msg));
+                    },
+                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                );
+            });
+        }
+
+        async function testConnection() {
+            log("🔍 正在測試後端連線...");
+            try {
+                const response = await fetch(SPREADSHEET_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({ action: "test", memberid: "test" })
+                });
+                log("📡 伺服器連線成功", "text-green-400 font-bold");
+            } catch (e) {
+                log("❌ 連線失敗，請檢查網路或部署", "text-red-400 font-bold");
+            }
+        }
+
+        function playSound(type) {
             try {
                 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
                 const oscillator = audioCtx.createOscillator();
                 const gainNode = audioCtx.createGain();
-
-                oscillator.type = 'sine';
-                oscillator.frequency.setValueAtTime(880, audioCtx.currentTime); 
-                oscillator.frequency.exponentialRampToValueAtTime(1320, audioCtx.currentTime + 0.1); 
-                
-                gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
-                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
-
                 oscillator.connect(gainNode);
                 gainNode.connect(audioCtx.destination);
-
-                oscillator.start();
-                oscillator.stop(audioCtx.currentTime + 0.3);
-            } catch (e) {
-                console.error("音效播放失敗", e);
-            }
-        }
-
-        // 核心邏輯：處理簽到
-        async function processCheckIn(data) {
-            const now = Date.now();
-            if (data.memberid === lastScannedId && (now - lastScannedTime < 3000)) {
-                return; 
-            }
-
-            isProcessing = true;
-            lastScannedId = data.memberid;
-            lastScannedTime = now;
-
-            playSuccessSound();
-            if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
-            
-            lastScannedPrayer.innerText = data.prayer || "未知成員";
-            lastScannedDetails.innerText = data.temple || "";
-            successStatus.classList.remove('hidden');
-            showToast(`✅ ${data.prayer} 簽到完成`);
-
-            const signData = {
-                memberid: data.memberid,
-                prayer: data.prayer, // 將欄位更名為 prayer
-                temple: data.temple || "無",
-                scnMember: data.scnmember || data.scnMember || "一般",
-                timestamp: new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' })
-            };
-
-            sendToSpreadsheet(signData);
-            addRecordToHistory(signData);
-
-            setTimeout(() => {
-                isProcessing = false;
-                successStatus.classList.add('hidden');
-            }, 3500);
-        }
-
-        async function sendToSpreadsheet(data) {
-            if (SPREADSHEET_URL.includes("你的網址")) return;
-            try {
-                await fetch(SPREADSHEET_URL, {
-                    method: 'POST',
-                    mode: 'no-cors',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
-                });
-            } catch (e) {
-                console.error("雲端發送失敗", e);
-            }
-        }
-
-        function onScanSuccess(decodedText) {
-            if (isProcessing) return;
-
-            let data = null;
-            try {
-                const rawData = JSON.parse(decodedText);
-                data = {};
-                Object.keys(rawData).forEach(key => {
-                    data[key.toLowerCase()] = rawData[key];
-                });
-                // 優先使用 prayer，若無則回退至 name
-                data.prayer = data.prayer || data.name || "未知";
-                data.memberid = data.memberid || data.id || "未知";
-            } catch (e) {
-                const parts = decodedText.split(',').map(item => item.trim());
-                if (parts.length >= 2) {
-                    data = {
-                        memberid: parts[0],
-                        prayer: parts[1], // CSV 模式下假設第二個欄位是 prayer
-                        temple: parts[2] || "無",
-                        scnmember: parts[3] || "一般"
-                    };
+                if (type === 'success') {
+                    oscillator.frequency.setValueAtTime(880, audioCtx.currentTime);
+                    oscillator.frequency.exponentialRampToValueAtTime(1320, audioCtx.currentTime + 0.1);
+                    gainNode.gain.setValueAtTime(0.05, audioCtx.currentTime);
+                    oscillator.start(); oscillator.stop(audioCtx.currentTime + 0.2);
+                } else {
+                    oscillator.type = 'square';
+                    oscillator.frequency.setValueAtTime(220, audioCtx.currentTime);
+                    gainNode.gain.setValueAtTime(0.05, audioCtx.currentTime);
+                    oscillator.start(); oscillator.stop(audioCtx.currentTime + 0.4);
                 }
+            } catch(e) {}
+        }
+
+        async function onScanSuccess(decodedText) {
+            const rawContent = decodedText ? decodedText.trim() : "";
+            if (!rawContent) return;
+            if (navigator.vibrate) navigator.vibrate(50);
+
+            let memberid = "";
+            try {
+                const obj = JSON.parse(rawContent);
+                if (typeof obj === 'object' && obj !== null) {
+                    memberid = obj.MemberID || obj.memberid || obj.Memberid || obj.id || "";
+                    for (let key in obj) {
+                        if (key.toLowerCase() === "memberid") {
+                            memberid = obj[key];
+                            break;
+                        }
+                    }
+                } else { memberid = rawContent; }
+            } catch(e) { memberid = rawContent; }
+
+            memberid = memberid.toString().trim();
+            if (!memberid) {
+                log(`❗ 讀取失敗: 內容中找不到 ID`, "text-yellow-500");
+                return;
             }
 
-            if (data && data.prayer) {
-                processCheckIn(data);
+            const now = Date.now();
+            if (memberid === lastId && (now - lastTime < 5000)) {
+                log(`⏳ 重複 ID (${memberid})，冷卻中`, "text-slate-500");
+                return;
+            }
+
+            if (isProcessing) return;
+            isProcessing = true;
+            lastId = memberid;
+            lastTime = now;
+
+            statusCard.classList.remove('hidden');
+            cardLoading.classList.remove('hidden');
+            cardSuccess.classList.add('hidden');
+            cardError.classList.add('hidden');
+            loadingText.innerText = "正在進行定位驗證...";
+            statusCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+            try {
+                // 1. 定位驗證
+                log("📍 請求地理位置權限...");
+                const coords = await getCurrentLocation();
+                const distance = getDistance(coords.latitude, coords.longitude, TARGET_LOCATION.lat, TARGET_LOCATION.lng);
+                
+                log(`📏 距離目標約 ${Math.round(distance)} 公尺`);
+
+                if (distance > DISTANCE_LIMIT) {
+                    log(`❌ 距離太遠 (${Math.round(distance)}m)，禁止簽到`, "text-red-400 font-bold");
+                    throw new Error(`超出簽到範圍 (目前距離 ${Math.round(distance)} 公尺)`);
+                }
+
+                // 2. 後端比對
+                loadingText.innerText = "定位通過，比對名冊中...";
+                log("🚀 定位驗證通過，發送簽到請求...");
+
+                const response = await fetch(SPREADSHEET_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({ 
+                        action: "checkin", 
+                        memberid: memberid,
+                        lat: coords.latitude,
+                        lng: coords.longitude,
+                        dist: Math.round(distance)
+                    })
+                });
+                
+                const result = await response.json();
+
+                if (result.status === "success") {
+                    log(`✅ 簽到成功: ${result.data.prayer}`, "text-green-400 font-bold");
+                    
+                    document.getElementById('display-prayer').innerText = result.data.prayer;
+                    document.getElementById('display-seat').innerText = `座號 ${result.data.seat_number}`;
+                    document.getElementById('display-temple').innerText = result.data.temple;
+
+                    cardLoading.classList.add('hidden');
+                    cardSuccess.classList.remove('hidden');
+                    statusCard.classList.remove('border-red-700');
+                    statusCard.classList.add('border-green-700');
+                    playSound('success');
+
+                    addRecordToHistory({
+                        prayer: result.data.prayer,
+                        memberid: memberid,
+                        seat_number: result.data.seat_number,
+                        timestamp: new Date().toLocaleTimeString('zh-TW', {hour12: false})
+                    });
+                    
+                    setTimeout(() => { isProcessing = false; statusCard.classList.add('hidden'); }, 4000);
+                } else {
+                    log(`❌ 驗證失敗: ${result.message}`, "text-red-400 font-bold");
+                    throw new Error(result.message);
+                }
+            } catch (err) {
+                log(`💥 錯誤: ${err.message}`, "text-red-500 font-bold");
+                cardLoading.classList.add('hidden');
+                cardError.classList.remove('hidden');
+                statusCard.classList.remove('border-green-700');
+                statusCard.classList.add('border-red-700');
+                
+                document.getElementById('error-message').innerText = err.message;
+                document.getElementById('scanned-id-hint').innerText = memberid;
+                playSound('error');
+                
+                setTimeout(() => { isProcessing = false; statusCard.classList.add('hidden'); }, 6000);
             }
         }
 
         function addRecordToHistory(data) {
-            noRecord.classList.add('hidden');
+            document.getElementById('no-record').classList.add('hidden');
             const div = document.createElement('div');
-            div.className = "check-in-item bg-white p-6 rounded-[1.5rem] shadow-sm border border-slate-100 flex items-center justify-between";
+            div.className = "bg-white p-3 rounded-2xl border border-slate-100 flex items-center justify-between shadow-sm";
             div.innerHTML = `
-                <div class="flex items-center gap-4">
-                    <div class="w-14 h-14 bg-blue-600 text-white rounded-2xl flex items-center justify-center font-black text-2xl shadow-lg shadow-blue-200">
-                        ${data.prayer[0]}
-                    </div>
-                    <div>
-                        <p class="font-black text-2xl text-slate-800">${data.prayer}</p>
-                        <p class="text-xs text-slate-400 font-bold uppercase mt-1 tracking-wider">${data.timestamp}</p>
-                    </div>
+                <div class="flex items-center gap-2">
+                    <span class="bg-blue-600 text-white font-black text-[10px] w-6 h-6 flex items-center justify-center rounded-lg shadow-sm">${data.seat_number}</span>
+                    <span class="font-black text-sm text-slate-700">${data.prayer}</span>
                 </div>
-                <div class="text-right">
-                    <p class="text-lg text-slate-600 font-black">${data.temple}</p>
-                    <span class="text-xs bg-slate-100 text-slate-500 px-3 py-1 rounded-full mt-2 inline-block font-bold">ID: ${data.memberid}</span>
-                </div>
+                <span class="text-[9px] text-slate-400 font-mono">${data.timestamp}</span>
             `;
-            historyList.prepend(div);
-            scanHistory.push(data);
-            recordCount.innerText = `${scanHistory.length} 人`;
-        }
-
-        function showToast(msg) {
-            toast.innerText = msg;
-            toast.style.opacity = "1";
-            toast.style.top = "60px";
-            setTimeout(() => {
-                toast.style.opacity = "0";
-                toast.style.top = "12px";
-            }, 3000);
+            const list = document.getElementById('history-list');
+            list.prepend(div);
+            document.getElementById('record-count').innerText = list.children.length - (document.getElementById('no-record').classList.contains('hidden') ? 0 : 1);
         }
 
         let html5QrcodeScanner = new Html5QrcodeScanner(
-            "reader", 
-            { 
-                fps: 25, 
-                qrbox: { width: 280, height: 280 }, 
-                aspectRatio: 1.0,
-                showTorchButtonIfSupported: true 
-            }, 
-            false
+            "reader", { fps: 30, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 }, false
         );
         html5QrcodeScanner.render(onScanSuccess, () => {});
+
+        window.onload = () => { log("✅ 系統已就緒 (含定位驗證)"); };
     </script>
 </body>
 </html>
