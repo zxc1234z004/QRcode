@@ -53,7 +53,7 @@
             </div>
             <div id="card-error" class="hidden bg-red-600 text-white p-10 flex flex-col items-center gap-3 text-center text-white">
                 <p id="error-message" class="text-3xl font-black text-white leading-tight">驗證失敗</p>
-                <p id="scanned-id-hint" class="text-xs font-mono opacity-70 break-all text-white">ID: --</p>
+                <p id="scanned-id-hint" class="text-xs font-mono opacity-70 break-all text-white">memberId: --</p>
             </div>
         </div>
 
@@ -93,6 +93,12 @@
 
         async function loadLocations() {
             log("☁️ 正在同步多場地設定...");
+            
+            // 檢查地理定位可用性
+            if (!navigator.geolocation) {
+                log("⚠️ 警告：瀏覽器不支援地理定位功能", "text-yellow-400");
+            }
+
             try {
                 const res = await fetch(SPREADSHEET_URL);
                 const result = await res.json();
@@ -139,20 +145,41 @@
             return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         }
 
+        function getCurrentPosition() {
+            return new Promise((resolve, reject) => {
+                if (!navigator.geolocation) {
+                    reject(new Error("瀏覽器不支援定位功能"));
+                    return;
+                }
+                navigator.geolocation.getCurrentPosition(resolve, (error) => {
+                    if (error.code === error.PERMISSION_DENIED) {
+                        reject(new Error("定位權限遭拒或受安全政策封鎖 (需 HTTPS)"));
+                    } else {
+                        reject(new Error("無法取得定位資訊 (" + error.message + ")"));
+                    }
+                }, { timeout: 8000, enableHighAccuracy: true });
+            });
+        }
+
         async function onScanSuccess(decodedText) {
             if (isProcessing || !currentLocation) return;
             
-            // 解析邏輯：優先從 JSON 格式讀取 MemberID 欄位
+            let rawContent = decodedText.trim();
             let memberid = "";
+
             try {
-                const qrData = JSON.parse(decodedText);
-                memberid = (qrData.MemberID || qrData.memberid || qrData.id || "").toString().trim();
+                const qrData = JSON.parse(rawContent);
+                if (typeof qrData === 'object' && qrData !== null) {
+                    memberid = (qrData.memberId || "").toString().trim();
+                } else {
+                    memberid = rawContent;
+                }
             } catch (e) {
-                memberid = decodedText.trim();
+                memberid = rawContent;
             }
 
             if (!memberid) {
-                log("❗ 掃描內容無效，無法識別 ID", "text-yellow-500");
+                log(`❗ 識別失敗。讀取內容中無 memberId 欄位`, "text-yellow-500");
                 return;
             }
 
@@ -169,14 +196,20 @@
             try {
                 if (!isAdminMode && !verifiedCoords) {
                     log("📍 偵測首次定位...");
-                    const pos = await new Promise((res, rej) => navigator.geolocation.getCurrentPosition(p => res(p.coords), e => rej(e), {timeout: 8000}));
-                    const dist = getDistance(pos.latitude, pos.longitude, currentLocation.lat, currentLocation.lng);
-                    log(`📏 距離 ${currentLocation.locationName} 約 ${Math.round(dist)}m`);
-                    if (dist > currentLocation.limit) throw new Error(`不在範圍內 (${Math.round(dist)}m)`);
-                    verifiedCoords = pos;
+                    try {
+                        const pos = await getCurrentPosition();
+                        const dist = getDistance(pos.coords.latitude, pos.coords.longitude, currentLocation.lat, currentLocation.lng);
+                        log(`📏 距離 ${currentLocation.locationName} 約 ${Math.round(dist)}m`);
+                        if (dist > currentLocation.limit) throw new Error(`不在範圍內 (${Math.round(dist)}m)`);
+                        verifiedCoords = pos.coords;
+                    } catch (geoError) {
+                        // 針對權限政策錯誤提供明確建議
+                        log(`❌ 定位失敗: ${geoError.message}`, "text-red-400");
+                        throw new Error(geoError.message + "。請確認使用 HTTPS 連線或改用管理員模式。");
+                    }
                 }
 
-                log(`🚀 正在驗證 ID: ${memberid}...`);
+                log(`🚀 驗證 memberId: ${memberid}...`);
                 const response = await fetch(SPREADSHEET_URL, {
                     method: 'POST',
                     body: JSON.stringify({ 
@@ -201,7 +234,7 @@
                 document.getElementById('card-loading').classList.add('hidden');
                 document.getElementById('card-error').classList.remove('hidden');
                 document.getElementById('error-message').innerText = err.message;
-                document.getElementById('scanned-id-hint').innerText = memberid;
+                document.getElementById('scanned-id-hint').innerText = "memberId: " + memberid;
                 log(`❌ 錯誤: ${err.message}`, "text-red-400");
                 setTimeout(() => { isProcessing = false; statusCard.classList.add('hidden'); }, 5000);
             }
