@@ -10,26 +10,34 @@
         #reader { border: none !important; border-radius: 2rem; overflow: hidden; }
         #reader__dashboard_section_csr button { background-color: #3b82f6 !important; color: white !important; padding: 0.6rem 1.2rem !important; border-radius: 0.75rem !important; border: none !important; font-size: 14px; font-weight: 700; }
         #debug-log { font-family: monospace; font-size: 11px; max-height: 100px; overflow-y: auto; display: flex; flex-direction: column-reverse; }
-        .admin-active { ring-color: #f59e0b !important; border-color: #f59e0b !important; }
+        .admin-active { color: #f59e0b !important; background-color: #fef3c7 !important; }
     </style>
 </head>
 <body class="bg-slate-50 min-h-screen font-sans pb-10 text-slate-900">
 
     <div class="max-w-md mx-auto px-4 py-8">
-        <!-- 頂部場地選擇區 -->
-        <div class="bg-white rounded-[2rem] shadow-lg p-6 mb-6">
+        <div class="bg-white rounded-[2rem] shadow-lg p-6 mb-6 border-2 border-white">
             <div class="flex justify-between items-center mb-4">
-                <h1 class="text-2xl font-black text-slate-800 tracking-tighter">簽到場地切換</h1>
+                <h1 class="text-2xl font-black text-blue-900 tracking-tighter">班期簽到管理</h1>
                 <button onclick="unlockAdmin()" id="admin-btn" class="p-2 bg-slate-100 rounded-xl text-slate-400 transition-colors">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                 </button>
             </div>
             
-            <div class="space-y-1">
-                <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">請選擇當前位置</label>
-                <select id="location-selector" onchange="changeLocation()" class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl p-4 font-bold text-slate-700 outline-none focus:border-blue-500 transition-all appearance-none">
-                    <option value="">載入地點中...</option>
-                </select>
+            <div class="space-y-4">
+                <div>
+                    <label class="text-[10px] font-bold text-slate-400 uppercase ml-1 tracking-widest">1. 目前地點 (定位與密碼)</label>
+                    <select id="location-selector" onchange="changeLocation()" class="w-full bg-slate-50 border-2 border-slate-100 rounded-xl p-3 font-bold text-slate-700 outline-none focus:border-blue-500 appearance-none shadow-inner">
+                        <option value="">載入中...</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="text-[10px] font-bold text-slate-400 uppercase ml-1 tracking-widest text-green-600">2. 選擇簽到班級 (比對名冊)</label>
+                    <select id="class-selector" onchange="changeClass()" class="w-full bg-slate-50 border-2 border-slate-100 rounded-xl p-3 font-bold text-slate-700 outline-none focus:border-green-500 appearance-none shadow-inner">
+                        <option value="">載入中...</option>
+                    </select>
+                </div>
             </div>
         </div>
 
@@ -38,22 +46,21 @@
             <div id="admin-badge" class="hidden absolute top-4 right-4 bg-amber-500 text-white text-[10px] font-black px-2 py-1 rounded-lg z-10 shadow-lg animate-bounce">管理員：免定位模式</div>
         </div>
 
-        <!-- 狀態顯示卡片 -->
-        <div id="status-card" class="hidden animate-in zoom-in duration-200 mb-6 border-b-8 rounded-[2.5rem] overflow-hidden shadow-2xl">
-            <div id="card-loading" class="hidden bg-blue-600 text-white p-10 flex flex-col items-center gap-3">
+        <div id="status-card" class="hidden animate-in zoom-in duration-200 mb-6 border-b-8 rounded-[2.5rem] overflow-hidden shadow-2xl transition-all">
+            <div id="card-loading" class="hidden bg-blue-600 text-white p-10 flex flex-col items-center gap-3 text-center">
                 <div class="animate-spin h-10 w-10 border-4 border-white/30 border-t-white rounded-full"></div>
-                <p id="loading-text" class="text-xl font-black tracking-widest uppercase">定位比對中...</p>
+                <p class="text-xl font-black tracking-widest uppercase">驗證中...</p>
             </div>
             <div id="card-success" class="hidden bg-green-600 text-white p-10 flex flex-col items-center gap-4 text-center">
                 <span id="display-seat" class="bg-white text-green-600 font-black text-xl px-4 py-1 rounded-xl shadow-lg">座號 --</span>
                 <div>
-                    <p id="display-prayer" class="text-6xl font-black mb-1 leading-none text-white">祈福者</p>
-                    <p id="display-temple" class="text-lg opacity-90 font-bold text-white">隸屬單位</p>
+                    <p id="display-prayer" class="text-6xl font-black mb-1 leading-none text-white">姓名</p>
+                    <p id="display-temple" class="text-lg opacity-90 font-bold text-white">單位</p>
                 </div>
             </div>
-            <div id="card-error" class="hidden bg-red-600 text-white p-10 flex flex-col items-center gap-3 text-center text-white">
-                <p id="error-message" class="text-3xl font-black text-white leading-tight">驗證失敗</p>
-                <p id="scanned-id-hint" class="text-xs font-mono opacity-70 break-all text-white">memberId: --</p>
+            <div id="card-error" class="hidden bg-red-600 text-white p-10 flex flex-col items-center gap-3 text-center">
+                <p id="error-message" class="text-2xl font-black leading-tight">驗證失敗</p>
+                <p id="scanned-id-hint" class="text-xs font-mono opacity-70 break-all">ID: --</p>
             </div>
         </div>
 
@@ -67,18 +74,22 @@
     </div>
 
     <script>
-        const SPREADSHEET_URL = "https://script.google.com/macros/s/AKfycbwlMiYJdVv7S0fB8zUgKhHajxS3tIVhBpJ1GbbOsWXuIaHNwn53_uW8UzzGYzwkHHt4/exec";
+        const SPREADSHEET_URL = "https://script.google.com/macros/s/AKfycby2Eaaw-MCs-zfX5b5W5k_y20rfRZJVW4zMtZIqHMjNPFSkBUb9ZTrNuwSQmrG0iw2U/exec";
         
-        let allLocations = [];
-        let currentLocation = null;
+        let allConfig = { locations: [], classes: [] };
+        let currentLoc = null;
+        let currentClass = null;
         let verifiedCoords = null;
         let isAdminMode = false;
         let isProcessing = false;
         let lastId = "";
         let lastTime = 0;
 
-        const selector = document.getElementById('location-selector');
+        const locSelector = document.getElementById('location-selector');
+        const classSelector = document.getElementById('class-selector');
         const debugLog = document.getElementById('debug-log');
+        const adminBtn = document.getElementById('admin-btn');
+        const adminBadge = document.getElementById('admin-badge');
 
         function log(msg, color = "text-blue-200") {
             const time = new Date().toLocaleTimeString('zh-TW', {hour12: false});
@@ -91,50 +102,93 @@
 
         function clearLog() { debugLog.innerHTML = ""; }
 
-        async function loadLocations() {
-            log("☁️ 正在同步多場地設定...");
-            
-            // 檢查地理定位可用性
-            if (!navigator.geolocation) {
-                log("⚠️ 警告：瀏覽器不支援地理定位功能", "text-yellow-400");
+        async function initApp() {
+            log("☁️ 嘗試同步雲端設定...");
+            try {
+                const res = await fetch(`${SPREADSHEET_URL}?action=init`, { cache: 'no-store' });
+                const result = await res.json();
+                
+                if (result.status === "success" && result.data) {
+                    allConfig = result.data;
+                    updateSelectors();
+                    log("✅ 設定載入成功");
+                } else {
+                    log("❌ 資料格式錯誤: " + result.message, "text-red-400");
+                }
+            } catch (e) { 
+                log(`❌ 連線失敗: ${e.message}`, "text-red-400"); 
+            }
+        }
+
+        function updateSelectors() {
+            if (allConfig.locations && allConfig.locations.length > 0) {
+                locSelector.innerHTML = allConfig.locations.map((l, i) => 
+                    `<option value="${i}">${l.name || '未命名地點'}</option>`
+                ).join('');
+                changeLocation();
+            } else {
+                locSelector.innerHTML = '<option value="">無地點資料</option>';
             }
 
-            try {
-                const res = await fetch(SPREADSHEET_URL);
-                const result = await res.json();
-                if (result.status === "success") {
-                    allLocations = result.data;
-                    selector.innerHTML = allLocations.map((loc, idx) => 
-                        `<option value="${idx}">${loc.locationName}</option>`
-                    ).join('');
-                    
-                    changeLocation();
-                    log(`✅ 已載入 ${allLocations.length} 個地點`, "text-green-400 font-bold");
-                }
-            } catch (e) { log("❌ 地點載入失敗，請檢查網路", "text-red-400"); }
+            if (allConfig.classes && allConfig.classes.length > 0) {
+                classSelector.innerHTML = allConfig.classes.map((className, i) => 
+                    `<option value="${i}">${className}</option>`
+                ).join('');
+                changeClass();
+            } else {
+                classSelector.innerHTML = '<option value="">無班級資料</option>';
+            }
         }
 
         function changeLocation() {
-            currentLocation = allLocations[selector.value];
+            const index = locSelector.value;
+            if (index !== "" && allConfig.locations[index]) {
+                currentLoc = allConfig.locations[index];
+                // 切換地點時重置管理員模式與定位狀態
+                resetAdminStatus();
+                log(`📍 地點：${currentLoc.name}`);
+            }
+        }
+
+        function changeClass() {
+            const index = classSelector.value;
+            if (index !== "" && allConfig.classes[index]) {
+                currentClass = allConfig.classes[index];
+                log(`📑 班級：${currentClass}`);
+            }
+        }
+
+        function resetAdminStatus() {
+            isAdminMode = false;
             verifiedCoords = null;
-            log(`📍 切換至：${currentLocation.locationName}`, "text-blue-400 font-bold");
+            adminBadge.classList.add('hidden');
+            adminBtn.classList.remove('admin-active');
         }
 
         function unlockAdmin() {
-            if (isAdminMode) {
-                isAdminMode = false;
-                document.getElementById('admin-badge').classList.add('hidden');
-                document.getElementById('admin-btn').classList.remove('text-amber-500');
-                log("🔒 已關閉管理員模式");
+            if (!currentLoc) {
+                alert("請先選擇地點");
                 return;
             }
-            const input = prompt("請輸入管理員解鎖密碼：");
-            if (input === currentLocation.password) {
+            
+            if (isAdminMode) {
+                resetAdminStatus();
+                log("🔒 關閉管理員模式，恢復定位驗證");
+                return;
+            }
+
+            const input = prompt(`請輸入 ${currentLoc.name} 的管理員解鎖密碼：`);
+            if (input === null) return; // 使用者按取消
+
+            if (input === String(currentLoc.password)) {
                 isAdminMode = true;
-                document.getElementById('admin-badge').classList.remove('hidden');
-                document.getElementById('admin-btn').classList.add('text-amber-500');
-                log("🔓 管理員模式啟動", "text-amber-400 font-bold");
-            } else if (input !== null) { alert("密碼錯誤！"); }
+                adminBadge.classList.remove('hidden');
+                adminBtn.classList.add('admin-active');
+                log("🔓 免定位模式開啟 (管理員已授權)", "text-amber-400 font-bold");
+            } else { 
+                alert("密碼錯誤，無法解鎖免定位功能。"); 
+                log("⚠️ 管理員密碼嘗試失敗", "text-red-300");
+            }
         }
 
         function getDistance(lat1, lon1, lat2, lon2) {
@@ -145,44 +199,15 @@
             return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         }
 
-        function getCurrentPosition() {
-            return new Promise((resolve, reject) => {
-                if (!navigator.geolocation) {
-                    reject(new Error("瀏覽器不支援定位功能"));
-                    return;
-                }
-                navigator.geolocation.getCurrentPosition(resolve, (error) => {
-                    if (error.code === error.PERMISSION_DENIED) {
-                        reject(new Error("定位權限遭拒或受安全政策封鎖 (需 HTTPS)"));
-                    } else {
-                        reject(new Error("無法取得定位資訊 (" + error.message + ")"));
-                    }
-                }, { timeout: 8000, enableHighAccuracy: true });
-            });
-        }
-
         async function onScanSuccess(decodedText) {
-            if (isProcessing || !currentLocation) return;
-            
-            let rawContent = decodedText.trim();
+            if (isProcessing || !currentLoc || !currentClass) return;
             let memberid = "";
-
             try {
-                const qrData = JSON.parse(rawContent);
-                if (typeof qrData === 'object' && qrData !== null) {
-                    memberid = (qrData.memberId || "").toString().trim();
-                } else {
-                    memberid = rawContent;
-                }
-            } catch (e) {
-                memberid = rawContent;
-            }
+                const qrData = JSON.parse(decodedText.trim());
+                memberid = (qrData.memberId || qrData.id || "").toString().trim();
+            } catch (e) { memberid = decodedText.trim(); }
 
-            if (!memberid) {
-                log(`❗ 識別失敗。讀取內容中無 memberId 欄位`, "text-yellow-500");
-                return;
-            }
-
+            if (!memberid) return;
             const now = Date.now();
             if (memberid === lastId && (now - lastTime < 5000)) return;
 
@@ -194,55 +219,69 @@
             document.getElementById('card-error').classList.add('hidden');
 
             try {
+                // 如果不是管理員模式，且還沒驗證過座標，才執行定位
                 if (!isAdminMode && !verifiedCoords) {
-                    log("📍 偵測首次定位...");
-                    try {
-                        const pos = await getCurrentPosition();
-                        const dist = getDistance(pos.coords.latitude, pos.coords.longitude, currentLocation.lat, currentLocation.lng);
-                        log(`📏 距離 ${currentLocation.locationName} 約 ${Math.round(dist)}m`);
-                        if (dist > currentLocation.limit) throw new Error(`不在範圍內 (${Math.round(dist)}m)`);
-                        verifiedCoords = pos.coords;
-                    } catch (geoError) {
-                        // 針對權限政策錯誤提供明確建議
-                        log(`❌ 定位失敗: ${geoError.message}`, "text-red-400");
-                        throw new Error(geoError.message + "。請確認使用 HTTPS 連線或改用管理員模式。");
+                    log("📍 執行定位驗證...");
+                    const pos = await new Promise((res, rej) => {
+                        navigator.geolocation.getCurrentPosition(
+                            p => res(p.coords), 
+                            e => {
+                                let msg = "定位失敗";
+                                if (e.code === 1) msg = "請允許瀏覽器定位權限";
+                                rej(new Error(msg));
+                            }, 
+                            { timeout: 8000, enableHighAccuracy: true }
+                        );
+                    });
+                    
+                    const dist = getDistance(pos.latitude, pos.longitude, currentLoc.lat, currentLoc.lng);
+                    log(`📏 距離約 ${Math.round(dist)}m`);
+                    
+                    if (dist > currentLoc.limit) {
+                        throw new Error(`超出簽到範圍 (${Math.round(dist)}m)`);
                     }
+                    verifiedCoords = pos; // 驗證成功後記錄，該次開啟期間不重複驗證
+                } else if (isAdminMode) {
+                    log("⚡ 管理員模式：跳過定位驗證", "text-amber-400");
                 }
 
-                log(`🚀 驗證 memberId: ${memberid}...`);
+                log(`🚀 發送簽到：${memberid}`);
                 const response = await fetch(SPREADSHEET_URL, {
                     method: 'POST',
                     body: JSON.stringify({ 
-                        action: "checkin", 
-                        memberid: memberid, 
-                        locationName: currentLocation.locationName,
-                        isBypass: isAdminMode 
+                        action: "signin", 
+                        memberId: memberid, 
+                        locationName: currentLoc.name,
+                        className: currentClass,
+                        status: isAdminMode ? "管理員手動點名 (免定位)" : "定位驗證成功"
                     })
                 });
                 const result = await response.json();
 
                 if (result.status === "success") {
-                    document.getElementById('display-prayer').innerText = result.data.prayer;
-                    document.getElementById('display-seat').innerText = `座號 ${result.data.seat_number}`;
-                    document.getElementById('display-temple').innerText = result.data.temple;
+                    document.getElementById('display-prayer').innerText = result.data.name || "未知";
+                    document.getElementById('display-seat').innerText = `座號 ${result.data.seatNum || '無'}`;
+                    document.getElementById('display-temple').innerText = result.data.area || "";
                     document.getElementById('card-loading').classList.add('hidden');
                     document.getElementById('card-success').classList.remove('hidden');
-                    log(`✅ ${result.data.prayer} 簽到成功`, "text-green-400 font-bold");
+                    log(`✅ ${result.data.name} 簽到成功`);
                     setTimeout(() => { isProcessing = false; statusCard.classList.add('hidden'); }, 3500);
-                } else { throw new Error(result.message); }
+                } else { 
+                    throw new Error(result.message); 
+                }
             } catch (err) {
                 document.getElementById('card-loading').classList.add('hidden');
                 document.getElementById('card-error').classList.remove('hidden');
                 document.getElementById('error-message').innerText = err.message;
-                document.getElementById('scanned-id-hint').innerText = "memberId: " + memberid;
-                log(`❌ 錯誤: ${err.message}`, "text-red-400");
+                document.getElementById('scanned-id-hint').innerText = "ID: " + memberid;
+                log(`❌ 失敗: ${err.message}`, "text-red-400");
                 setTimeout(() => { isProcessing = false; statusCard.classList.add('hidden'); }, 5000);
             }
         }
 
         const html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 30, qrbox: 250 }, false);
         html5QrcodeScanner.render(onScanSuccess, () => {});
-        window.onload = loadLocations;
+        window.onload = initApp;
     </script>
 </body>
 </html>
