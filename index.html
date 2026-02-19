@@ -144,7 +144,6 @@
             const index = locSelector.value;
             if (index !== "" && allConfig.locations[index]) {
                 currentLoc = allConfig.locations[index];
-                // 切換地點時重置管理員模式與定位狀態
                 resetAdminStatus();
                 log(`📍 地點：${currentLoc.name}`);
             }
@@ -178,7 +177,7 @@
             }
 
             const input = prompt(`請輸入 ${currentLoc.name} 的管理員解鎖密碼：`);
-            if (input === null) return; // 使用者按取消
+            if (input === null) return;
 
             if (input === String(currentLoc.password)) {
                 isAdminMode = true;
@@ -209,7 +208,9 @@
 
             if (!memberid) return;
             const now = Date.now();
-            if (memberid === lastId && (now - lastTime < 5000)) return;
+            
+            // 加快速度：相同 ID 冷卻時間縮短為 2 秒 (原為 5 秒)
+            if (memberid === lastId && (now - lastTime < 2000)) return;
 
             isProcessing = true; lastId = memberid; lastTime = now;
             const statusCard = document.getElementById('status-card');
@@ -219,9 +220,9 @@
             document.getElementById('card-error').classList.add('hidden');
 
             try {
-                // 如果不是管理員模式，且還沒驗證過座標，才執行定位
+                // 加快速度：如果已經有 verifiedCoords，就不再執行 navigator.geolocation
                 if (!isAdminMode && !verifiedCoords) {
-                    log("📍 執行定位驗證...");
+                    log("📍 執行首次定位驗證...");
                     const pos = await new Promise((res, rej) => {
                         navigator.geolocation.getCurrentPosition(
                             p => res(p.coords), 
@@ -230,7 +231,7 @@
                                 if (e.code === 1) msg = "請允許瀏覽器定位權限";
                                 rej(new Error(msg));
                             }, 
-                            { timeout: 8000, enableHighAccuracy: true }
+                            { timeout: 5000, enableHighAccuracy: true } // 縮短定位超時為 5 秒
                         );
                     });
                     
@@ -238,9 +239,12 @@
                     log(`📏 距離約 ${Math.round(dist)}m`);
                     
                     if (dist > currentLoc.limit) {
-                        throw new Error(`超出簽到範圍 (${Math.round(dist)}m)`);
+                        throw new Error(`超出範圍 (${Math.round(dist)}m)`);
                     }
-                    verifiedCoords = pos; // 驗證成功後記錄，該次開啟期間不重複驗證
+                    verifiedCoords = pos; // 儲存驗證成功狀態，下次跳過
+                    log("✅ 定位驗證已通過，後續掃描將跳過驗證", "text-green-400 text-[10px]");
+                } else if (verifiedCoords) {
+                    // 已驗證過，直接繼續
                 } else if (isAdminMode) {
                     log("⚡ 管理員模式：跳過定位驗證", "text-amber-400");
                 }
@@ -253,7 +257,8 @@
                         memberId: memberid, 
                         locationName: currentLoc.name,
                         className: currentClass,
-                        status: isAdminMode ? "管理員手動點名 (免定位)" : "定位驗證成功"
+                        status: isAdminMode ? "免定位模式" : "定位驗證成功",
+                        reason: "" 
                     })
                 });
                 const result = await response.json();
@@ -265,7 +270,12 @@
                     document.getElementById('card-loading').classList.add('hidden');
                     document.getElementById('card-success').classList.remove('hidden');
                     log(`✅ ${result.data.name} 簽到成功`);
-                    setTimeout(() => { isProcessing = false; statusCard.classList.add('hidden'); }, 3500);
+                    
+                    // 加快速度：成功顯示時間縮短為 1.5 秒 (原為 3.5 秒)
+                    setTimeout(() => { 
+                        isProcessing = false; 
+                        statusCard.classList.add('hidden'); 
+                    }, 1500);
                 } else { 
                     throw new Error(result.message); 
                 }
@@ -275,7 +285,10 @@
                 document.getElementById('error-message').innerText = err.message;
                 document.getElementById('scanned-id-hint').innerText = "ID: " + memberid;
                 log(`❌ 失敗: ${err.message}`, "text-red-400");
-                setTimeout(() => { isProcessing = false; statusCard.classList.add('hidden'); }, 5000);
+                
+                // 失敗則重置定位快取，要求下次重新驗證
+                verifiedCoords = null; 
+                setTimeout(() => { isProcessing = false; statusCard.classList.add('hidden'); }, 3000);
             }
         }
 
