@@ -294,17 +294,7 @@
 
         const html5QrcodeScanner = new Html5QrcodeScanner("reader", { 
             fps: 30, 
-            qrbox: (viewfinderWidth, viewfinderHeight) => {
-                const minEdgeIdx = Math.min(viewfinderWidth, viewfinderHeight);
-                const qrboxSize = Math.floor(minEdgeIdx * 0.7);
-                return {
-                    width: qrboxSize,
-                    height: qrboxSize
-                };
-            },
-            videoConstraints: {
-                aspectRatio: 1.77777778
-            },
+            qrbox: 250,
             experimentalFeatures: {
                 useBarCodeDetectorIfSupported: true
             }
