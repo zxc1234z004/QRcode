@@ -292,7 +292,13 @@
             }
         }
 
-        const html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 30, qrbox: 250 }, false);
+        const html5QrcodeScanner = new Html5QrcodeScanner("reader", { 
+            fps: 30, 
+            qrbox: 250,
+            experimentalFeatures: {
+                useBarCodeDetectorIfSupported: true
+            }
+        }, false);
         html5QrcodeScanner.render(onScanSuccess, () => {});
         window.onload = initApp;
     </script>
